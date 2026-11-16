@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>T20 Pressure Reliability Index (PRI)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .tabular { font-variant-numeric: tabular-nums; }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 1rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .tab-btn {
+      color: #475569;
+      font-weight: 500;
+    }
+    .tab-btn:hover {
+      color: #0f172a;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+
+  <!-- Clean Light Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-slate-900">
+          T20 Pressure Reliability Index (PRI)
+        </h1>
+        <p class="text-xs text-slate-500 mt-0.5">
+          IPL &amp; T20I (Jan 2022 – Nov 2026) &bull; 766 Matches &bull; Leverage Index &ge; 2.0
+        </p>
+      </div>
+
+      <nav class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 self-start md:self-auto">
+        <button onclick="switchTab('rankings')" id="tab-rankings" class="tab-btn active px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition">
+          Rankings
+        </button>
+        <button onclick="switchTab('player')" id="tab-player" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition">
+          Player Stats
+        </button>
+        <button onclick="switchTab('methodology')" id="tab-methodology" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition">
+          Methodology &amp; Lab
+        </button>
+        <button onclick="switchTab('regenerate')" id="tab-regenerate" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition">
+          Regenerate PRI
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 py-8 space-y-8">
+
+    <!-- ========================================================= -->
+    <!-- TAB 1: RANKINGS                                           -->
+    <!-- ========================================================= -->
+    <section id="panel-rankings" class="space-y-8">
+
+      <!-- Clean 4-Metric Summary -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-5">
+          <div class="text-xs font-medium text-slate-500">Matches Analyzed</div>
+          <div class="text-2xl font-bold text-slate-900 tabular mt-1">766</div>
+          <div class="text-xs text-slate-500 mt-1">351 IPL &bull; 415 T20I</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs font-medium text-slate-500">Deliveries Scored</div>
+          <div class="text-2xl font-bold text-slate-900 tabular mt-1">183,167</div>
+          <div class="text-xs text-slate-500 mt-1">84,815 IPL &bull; 98,352 T20I</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs font-medium text-slate-500">High-Pressure Balls</div>
+          <div class="text-2xl font-bold text-emerald-600 tabular mt-1">23,038</div>
+          <div class="text-xs text-slate-500 mt-1">12.6% of balls (LI &ge; 2.0)</div>
+        </div>
+        <div class="card p-5">
+          <div class="text-xs font-medium text-slate-500">Top-10 Cutoff</div>
+          <div class="text-2xl font-bold text-blue-600 tabular mt-1">75 / 8</div>
+          <div class="text-xs text-slate-500 mt-1">&ge;75 pressure balls, &ge;8 matches</div>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p class="text-sm text-slate-600">
+          <span class="font-semibold text-slate-900">PRI 50</span> is the role average; higher scores combine pressure impact (75%) and lift over baseline (25%). Click any player to inspect stats.
+        </p>
+        <input id="searchInput" type="text" placeholder="Search player..." class="bg-white border border-slate-300 rounded-lg px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 w-full sm:w-56" oninput="renderRankings()" />
+      </div>
+
+      <!-- Clean Dual Tables -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Batters -->
+        <div class="card overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900">Top 10 Batters</h2>
+            <span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Batting PRI</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 text-xs text-slate-500 uppercase border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">#</th>
+                  <th class="py-3 px-4">Batter</th>
+                  <th class="py-3 px-4 text-right">PRI</th>
+                  <th class="py-3 px-4 text-right">Balls</th>
+                  <th class="py-3 px-4 text-right">Mat</th>
+                  <th class="py-3 px-4 text-right">Runs (4/6)</th>
+                </tr>
+              </thead>
+              <tbody id="batterTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bowlers -->
+        <div class="card overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900">Top 10 Bowlers</h2>
+            <span class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700">Bowling PRI</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 text-xs text-slate-500 uppercase border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">#</th>
+                  <th class="py-3 px-4">Bowler</th>
+                  <th class="py-3 px-4 text-right">PRI</th>
+                  <th class="py-3 px-4 text-right">Balls</th>
+                  <th class="py-3 px-4 text-right">Mat</th>
+                  <th class="py-3 px-4 text-right">Runs / Wkts</th>
+                </tr>
+              </thead>
+              <tbody id="bowlerTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Single Clean Interactive Chart -->
+      <div class="card p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Pressure Volume vs. PRI Rating</h3>
+            <p class="text-xs text-slate-500">Click any point on the chart to open that player's detailed breakdown.</p>
+          </div>
+          <div class="inline-flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs self-start">
+            <button onclick="setChartRole('batter')" id="chartRoleBatter" class="px-3 py-1 rounded-md bg-white text-slate-900 font-semibold shadow-sm">Batters</button>
+            <button onclick="setChartRole('bowler')" id="chartRoleBowler" class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900">Bowlers</button>
+          </div>
+        </div>
+        <div class="h-80"><canvas id="mainScatterChart"></canvas></div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 2: PLAYER STATS                                       -->
+    <!-- ========================================================= -->
+    <section id="panel-player" class="hidden space-y-6">
+
+      <!-- Clean Player Selector -->
+      <div class="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Player</label>
+          <select id="playerSelect" onchange="selectPlayerById(this.value)" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"></select>
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Compare With</label>
+          <select id="compareSelect" onchange="renderPlayerDeepDive()" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30"></select>
+        </div>
+      </div>
+
+      <!-- Player Summary + Decomposition -->
+      <div id="playerDetailContainer" class="grid grid-cols-1 lg:grid-cols-3 gap-6"></div>
+
+      <!-- Comparison Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6">
+          <h3 class="text-sm font-bold text-slate-900">Head-to-Head Comparison</h3>
+          <p class="text-xs text-slate-500 mb-4">Scaled overview of PRI, volume, and pressure output</p>
+          <div class="h-72"><canvas id="compareBarChart"></canvas></div>
+        </div>
+        <div class="card p-6">
+          <h3 class="text-sm font-bold text-slate-900">Side-by-Side Stats</h3>
+          <p class="text-xs text-slate-500 mb-4">High-pressure (LI &ge; 2.0) descriptive figures</p>
+          <div id="compareTableContainer" class="overflow-x-auto"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 3: METHODOLOGY & PRESSURE LAB                         -->
+    <!-- ========================================================= -->
+    <section id="panel-methodology" class="hidden space-y-8">
+
+      <!-- 3-Step Overview -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="card p-6 space-y-2">
+          <div class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Step 1 &bull; Match Leverage</div>
+          <h3 class="text-base font-bold text-slate-900">Leverage Index &ge; 2.0</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            An XGBoost win-probability model simulates 6 outcomes (<span class="mono text-xs">0, 1, 2–3, 4, 6+, W</span>) before each ball. Deliveries with expected swing &ge; 2&times; the format-innings average are high-pressure.
+          </p>
+        </div>
+        <div class="card p-6 space-y-2">
+          <div class="text-xs font-semibold uppercase tracking-wider text-blue-700">Step 2 &bull; Delivery Credit</div>
+          <h3 class="text-base font-bold text-slate-900">WPA &amp; Pressure Lift</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Batters earn <span class="mono text-xs">+WPA</span>; bowlers earn <span class="mono text-xs">-WPA</span> (byes, leg-byes, penalties &amp; run-outs excluded). Lift compares shrunken pressure rate against the player's LI &lt; 2.0 baseline.
+          </p>
+        </div>
+        <div class="card p-6 space-y-2">
+          <div class="text-xs font-semibold uppercase tracking-wider text-slate-700">Step 3 &bull; Final Score</div>
+          <h3 class="text-base font-bold text-slate-900">Shrinkage &amp; 75/25 PRI</h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Empirical-Bayes shrinkage pulls small/noisy samples toward the pool average (<span class="mono text-xs">&tau;&sup2; &ge; 1.0</span>). Final score: <span class="mono text-xs">50 + 10&times;[0.75&middot;Z(shr) + 0.25&middot;Z(lift)]</span>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Interactive Pressure Simulator -->
+      <div class="card p-6 space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Interactive Match-Pressure Simulator (LI &ge; 2.0)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Test how match state determines whether a delivery is high-pressure (calibrated approximation of our model).</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="applySimPreset('comfort')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
+              25 off 30 (9 wkts)
+            </button>
+            <button onclick="applySimPreset('thriller')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200">
+              12 off 6 (2 wkts)
+            </button>
+            <button onclick="applySimPreset('inn1_rescue')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200">
+              1st Inn: 135/6 (16 ov)
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div class="lg:col-span-5 space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200/80">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs font-medium text-slate-600 block mb-1">Format</label>
+                <select id="simFormat" onchange="updateLeverageSimulator()" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900">
+                  <option value="IPL">IPL</option>
+                  <option value="T20I">T20I</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-slate-600 block mb-1">Innings</label>
+                <select id="simInnings" onchange="toggleSimInningsUI(); updateLeverageSimulator()" class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900">
+                  <option value="2">2nd Innings (Chase)</option>
+                  <option value="1">1st Innings</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-slate-600">Balls Remaining</span>
+                <span id="simBallsVal" class="mono font-semibold text-slate-900">6 balls</span>
+              </div>
+              <input id="simBalls" type="range" min="1" max="120" value="6" class="w-full accent-emerald-600" oninput="updateLeverageSimulator()" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-slate-600">Wickets Lost</span>
+                <span id="simWktsVal" class="mono font-semibold text-slate-900">8 wickets</span>
+              </div>
+              <input id="simWkts" type="range" min="0" max="9" value="8" class="w-full accent-emerald-600" oninput="updateLeverageSimulator()" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span id="simRunsLabel" class="text-slate-600">Runs Required</span>
+                <span id="simRunsVal" class="mono font-semibold text-slate-900">12 runs</span>
+              </div>
+              <input id="simRuns" type="range" min="1" max="220" value="12" class="w-full accent-emerald-600" oninput="updateLeverageSimulator()" />
+            </div>
+          </div>
+
+          <div class="lg:col-span-7 space-y-4">
+            <div class="grid grid-cols-3 gap-3">
+              <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <div class="text-xs text-slate-500">Win Probability</div>
+                <div id="simWpOut" class="text-xl font-bold text-slate-900 tabular mt-1">24.8%</div>
+              </div>
+              <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <div class="text-xs text-slate-500">Leverage Index</div>
+                <div id="simLiOut" class="text-xl font-bold text-emerald-600 tabular mt-1">4.12</div>
+              </div>
+              <div id="simBadgeBox" class="p-4 rounded-xl border flex flex-col justify-center">
+                <div id="simVerdictTitle" class="text-xs font-bold uppercase text-emerald-700">High Pressure</div>
+                <div id="simVerdictSub" class="text-[11px] text-emerald-600 mt-0.5">LI &ge; 2.0</div>
+              </div>
+            </div>
+            <div class="h-52"><canvas id="simOutcomeChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Validation & Limitations -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6 space-y-3">
+          <h3 class="text-sm font-bold text-slate-900">Win-Probability Diagnostics (5-Fold GroupKFold)</h3>
+          <p class="text-xs text-slate-500">Entire matches are held out together to avoid intra-match leakage.</p>
+          <table class="w-full text-xs text-left mt-2">
+            <thead class="text-slate-500 uppercase border-b border-slate-200">
+              <tr>
+                <th class="py-2">Model</th>
+                <th class="py-2 text-right">AUC</th>
+                <th class="py-2 text-right">Brier</th>
+                <th class="py-2 text-right">Log Loss</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 tabular">
+              <tr>
+                <td class="py-2.5 font-medium text-slate-900">1st Innings (Setting Target)</td>
+                <td class="py-2.5 text-right mono">0.653</td>
+                <td class="py-2.5 text-right mono">0.244</td>
+                <td class="py-2.5 text-right mono">0.695</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 font-medium text-slate-900">2nd Innings (Chase)</td>
+                <td class="py-2.5 text-right mono font-semibold text-emerald-700">0.878</td>
+                <td class="py-2.5 text-right mono">0.145</td>
+                <td class="py-2.5 text-right mono">0.452</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="text-xs text-slate-500 pt-1">
+            Excludes abandoned/no-result, Super Over/tied, and DLS shortened matches.
+          </p>
+        </div>
+
+        <div class="card p-6 space-y-3">
+          <h3 class="text-sm font-bold text-slate-900">Key Limitations</h3>
+          <ul class="text-xs text-slate-600 space-y-2 list-disc pl-4 leading-relaxed">
+            <li>Measures statistical <span class="font-medium text-slate-900">match leverage</span>, not psychological nerves.</li>
+            <li>6-outcome LI simulation approximates ball transitions; special illegal-ball/free-hit rules are simplified.</li>
+            <li>Venue, pitch wear, weather, and exact batter-bowler matchups are not explicitly modeled.</li>
+            <li>First-innings model has lower discrimination (AUC 0.653) than the chase model (0.878).</li>
+          </ul>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- TAB 4: REGENERATE PRI                                     -->
+    <!-- ========================================================= -->
+    <section id="panel-regenerate" class="hidden space-y-6">
+
+      <!-- Controls Card -->
+      <div class="card p-6 space-y-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Regenerate PRI Rankings</h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Adjust formula weights or upload your own CSV to recompute Empirical-Bayes shrinkage, lift, and rankings in your browser.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="downloadTemplateCSV('player')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
+              Player CSV Template
+            </button>
+            <button onclick="downloadTemplateCSV('ball')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
+              Ball-by-Ball Template
+            </button>
+            <button onclick="loadSampleCSVIntoEngine()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200">
+              Run Sample Pool CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-3 border-t border-slate-100">
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-slate-600">Performance Weight</span>
+              <span id="wPerfLabel" class="mono font-semibold text-slate-900">0.75</span>
+            </div>
+            <input id="wPerfInput" type="range" min="0" max="1" step="0.05" value="0.75" class="w-full accent-emerald-600" oninput="syncWeights('perf')" />
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-slate-600">Pressure Lift Weight</span>
+              <span id="wLiftLabel" class="mono font-semibold text-slate-900">0.25</span>
+            </div>
+            <input id="wLiftInput" type="range" min="0" max="1" step="0.05" value="0.25" class="w-full accent-blue-600" oninput="syncWeights('lift')" />
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-slate-600">Min Pressure Balls</span>
+              <span id="minBallsLabel" class="mono font-semibold text-slate-900">75</span>
+            </div>
+            <input id="minBallsInput" type="range" min="30" max="200" step="5" value="75" class="w-full accent-slate-700" oninput="regenerateFromControls()" />
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-slate-600">Min Mat / &tau;&sup2; Floor</span>
+              <span id="minMatchTauLabel" class="mono font-semibold text-slate-900">8 / 1.0</span>
+            </div>
+            <div class="flex gap-2">
+              <input id="minMatchesInput" type="range" min="3" max="30" step="1" value="8" class="w-1/2 accent-slate-700" oninput="regenerateFromControls()" />
+              <input id="tauFloorInput" type="range" min="0.5" max="5" step="0.5" value="1.0" class="w-1/2 accent-slate-700" oninput="regenerateFromControls()" />
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="text-xs text-slate-600">
+            <span class="font-semibold text-slate-900">Upload CSV:</span> Accepts <span class="mono">player,role,matches,pressure_balls,raw_rate,low_pressure_rate,s2</span> or <span class="mono">match_id,player,role,li,wpa</span>.
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <input id="csvFileInput" type="file" accept=".csv" class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:text-xs file:font-medium file:bg-white file:text-slate-700 hover:file:bg-slate-100 cursor-pointer" onchange="handleCSVUpload(event)" />
+            <button onclick="resetToReportCohort()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300">
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div id="regenStatusBanner" class="text-xs px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">
+          Mode: <span class="font-semibold">Report Cohort Sensitivity</span> &mdash; Adjusting weights on the Top-10 cohort. Upload a CSV or click "Run Sample Pool CSV" to run full Empirical-Bayes calculation from raw rates.
+        </div>
+      </div>
+
+      <!-- Regenerated Tables -->
+      <div class="card p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Regenerated Top 10 Output</h3>
+            <p id="regenSubtitle" class="text-xs text-slate-500">PRI = 50 + 10 &times; [0.75 &middot; Z(shrunken) + 0.25 &middot; Z(lift)]</p>
+          </div>
+          <button onclick="exportRegeneratedCSV()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition">
+            Export CSV
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <div class="bg-slate-50 px-4 py-2.5 text-xs font-semibold text-emerald-700 border-b border-slate-200">Batters</div>
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50/50 text-slate-500 uppercase border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3">#</th>
+                  <th class="py-2.5 px-3">Batter</th>
+                  <th class="py-2.5 px-3 text-right">New PRI</th>
+                  <th class="py-2.5 px-3 text-right">Orig</th>
+                  <th class="py-2.5 px-3 text-right">Balls / Mat</th>
+                </tr>
+              </thead>
+              <tbody id="regenBatterBody" class="divide-y divide-slate-100 tabular"></tbody>
+            </table>
+          </div>
+
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <div class="bg-slate-50 px-4 py-2.5 text-xs font-semibold text-blue-700 border-b border-slate-200">Bowlers</div>
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50/50 text-slate-500 uppercase border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3">#</th>
+                  <th class="py-2.5 px-3">Bowler</th>
+                  <th class="py-2.5 px-3 text-right">New PRI</th>
+                  <th class="py-2.5 px-3 text-right">Orig</th>
+                  <th class="py-2.5 px-3 text-right">Balls / Mat</th>
+                </tr>
+              </thead>
+              <tbody id="regenBowlerBody" class="divide-y divide-slate-100 tabular"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Python Script Card -->
+      <div class="card overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Python Reproduction Script (<span class="mono">regenerate_pri.py</span>)</h3>
+            <p class="text-xs text-slate-500">XGBoost (350 trees, depth 4, lr 0.045, seed 2026), 5-fold GroupKFold, Empirical-Bayes shrinkage.</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="copyPythonCode()" id="copyPyBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">Copy</button>
+            <button onclick="downloadPythonCode()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700">Download .py</button>
+          </div>
+        </div>
+        <pre id="pythonCodeBlock" class="p-5 text-xs mono text-slate-800 bg-slate-50 overflow-x-auto max-h-80 leading-relaxed"></pre>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-5 py-8 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
+    <div>T20 Pressure Reliability Index &bull; IPL &amp; T20I Analysis</div>
+    <div>Inspired by Mallawa Arachchi et al. (2024), cricWAR, FanGraphs LI &amp; Baseball-Reference WPA</div>
+  </footer>
+
+  <script>
+    // =========================================================================
+    // DATA
+    // =========================================================================
+    const REPORT_BATTERS = [
+      { id: 'iyer', rank: 1, name: 'Shreyas Iyer', short: 'Iyer', role: 'batter', pri: 79.49, balls: 150, matches: 31, runs: 311, fours: 23, sixes: 23, verifiedLift: 0.392, zShr: 2.710, zLift: 3.666, exactComponents: 'partial' },
+      { id: 'salt', rank: 2, name: 'Phil Salt', short: 'Salt', role: 'batter', pri: 72.04, balls: 216, matches: 50, runs: 393, fours: 49, sixes: 17, verifiedLift: null, zShr: 2.280, zLift: 1.976, exactComponents: 'estimated' },
+      { id: 'abhishek', rank: 3, name: 'Abhishek Sharma', short: 'Abhishek', role: 'batter', pri: 69.46, balls: 322, matches: 77, runs: 524, fours: 55, sixes: 28, rawRate: 0.728, shrRate: 0.272, lowRate: 0.175, verifiedLift: 0.097, zShr: 2.084, zLift: 1.535, exactComponents: 'exact' },
+      { id: 'jaiswal', rank: 4, name: 'Yashasvi Jaiswal', short: 'Jaiswal', role: 'batter', pri: 68.28, balls: 218, matches: 56, runs: 367, fours: 48, sixes: 16, verifiedLift: null, zShr: 1.950, zLift: 1.462, exactComponents: 'estimated' },
+      { id: 'chapman', rank: 5, name: 'Mark Chapman', short: 'Chapman', role: 'batter', pri: 65.22, balls: 83, matches: 17, runs: 133, fours: 13, sixes: 6, verifiedLift: null, zShr: 1.610, zLift: 1.258, exactComponents: 'estimated' },
+      { id: 'green', rank: 6, name: 'Cameron Green', short: 'Green', role: 'batter', pri: 64.87, balls: 108, matches: 29, runs: 218, fours: 26, sixes: 9, verifiedLift: null, zShr: 1.590, zLift: 1.178, exactComponents: 'estimated' },
+      { id: 'tilak', rank: 7, name: 'Namboori Tilak Varma', short: 'Tilak', role: 'batter', pri: 63.68, balls: 257, matches: 44, runs: 408, fours: 33, sixes: 21, verifiedLift: null, zShr: 1.480, zLift: 1.032, exactComponents: 'estimated' },
+      { id: 'maxwell', rank: 8, name: 'Glenn Maxwell', short: 'Maxwell', role: 'batter', pri: 63.68, balls: 129, matches: 27, runs: 228, fours: 27, sixes: 10, verifiedLift: null, zShr: 1.450, zLift: 1.122, exactComponents: 'estimated' },
+      { id: 'bethell', rank: 9, name: 'Jacob Bethell', short: 'Bethell', role: 'batter', pri: 63.38, balls: 77, matches: 14, runs: 130, fours: 13, sixes: 7, verifiedLift: null, zShr: 1.410, zLift: 1.122, exactComponents: 'estimated' },
+      { id: 'kohli', rank: 10, name: 'Virat Kohli', short: 'Kohli', role: 'batter', pri: 63.28, balls: 289, matches: 58, runs: 427, fours: 51, sixes: 12, verifiedLift: null, zShr: 1.440, zLift: 0.992, exactComponents: 'estimated' }
+    ];
+
+    const REPORT_BOWLERS = [
+      { id: 'ashwin', rank: 1, name: 'Ravichandran Ashwin', short: 'Ashwin', role: 'bowler', pri: 88.79, balls: 124, matches: 25, runsConceded: 127, wickets: 6, verifiedLift: 1.182, zShr: 3.740, zLift: 4.296, exactComponents: 'partial' },
+      { id: 'hazlewood', rank: 2, name: 'Josh Hazlewood', short: 'Hazlewood', role: 'bowler', pri: 78.80, balls: 236, matches: 38, runsConceded: 274, wickets: 21, verifiedLift: null, zShr: 3.040, zLift: 2.400, exactComponents: 'estimated' },
+      { id: 'axar', rank: 3, name: 'Axar Patel', short: 'Axar', role: 'bowler', pri: 68.56, balls: 252, matches: 59, runsConceded: 327, wickets: 6, verifiedLift: null, zShr: 1.980, zLift: 1.484, exactComponents: 'estimated' },
+      { id: 'taskin', rank: 4, name: 'Taskin Ahmed', short: 'Taskin', role: 'bowler', pri: 68.34, balls: 134, matches: 29, runsConceded: 138, wickets: 10, verifiedLift: null, zShr: 1.940, zLift: 1.516, exactComponents: 'estimated' },
+      { id: 'bracewell', rank: 5, name: 'Michael Bracewell', short: 'Bracewell', role: 'bowler', pri: 67.16, balls: 90, matches: 17, runsConceded: 96, wickets: 6, verifiedLift: null, zShr: 1.810, zLift: 1.434, exactComponents: 'estimated' },
+      { id: 'rashid', rank: 6, name: 'Rashid Khan', short: 'Rashid', role: 'bowler', pri: 66.27, balls: 272, matches: 58, runsConceded: 363, wickets: 18, verifiedLift: null, zShr: 1.760, zLift: 1.228, exactComponents: 'estimated' },
+      { id: 'mccoy', rank: 7, name: 'Obed McCoy', short: 'McCoy', role: 'bowler', pri: 66.02, balls: 107, matches: 23, runsConceded: 134, wickets: 10, verifiedLift: null, zShr: 1.700, zLift: 1.308, exactComponents: 'estimated' },
+      { id: 'narine', rank: 8, name: 'Sunil Narine', short: 'Narine', role: 'bowler', pri: 64.83, balls: 113, matches: 33, runsConceded: 141, wickets: 7, verifiedLift: null, zShr: 1.580, zLift: 1.192, exactComponents: 'estimated' },
+      { id: 'mohsin', rank: 9, name: 'Mohsin Khan', short: 'Mohsin', role: 'bowler', pri: 64.63, balls: 96, matches: 24, runsConceded: 120, wickets: 7, verifiedLift: null, zShr: 1.550, zLift: 1.202, exactComponents: 'estimated' },
+      { id: 'spencer', rank: 10, name: 'Spencer Johnson', short: 'Spencer', role: 'bowler', pri: 64.61, balls: 75, matches: 12, runsConceded: 94, wickets: 6, verifiedLift: null, zShr: 1.540, zLift: 1.224, exactComponents: 'estimated' }
+    ];
+
+    const ALL_PLAYERS = [...REPORT_BATTERS, ...REPORT_BOWLERS];
+    let selectedPlayerId = 'abhishek';
+    let activeChartRole = 'batter';
+    let charts = {};
+    let customRegenPool = null;
+    let lastRegenOutput = { batters: [], bowlers: [] };
+
+    // =========================================================================
+    // NAVIGATION
+    // =========================================================================
+    function switchTab(tab) {
+      ['rankings', 'player', 'methodology', 'regenerate'].forEach(t => {
+        document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+      });
+      if (tab === 'rankings') renderRankings();
+      if (tab === 'player') renderPlayerDeepDive();
+      if (tab === 'methodology') updateLeverageSimulator();
+      if (tab === 'regenerate') regenerateFromControls();
+    }
+
+    function destroyChart(key) {
+      if (charts[key]) {
+        charts[key].destroy();
+        delete charts[key];
+      }
+    }
+
+    // =========================================================================
+    // TAB 1: RANKINGS
+    // =========================================================================
+    function renderRankings() {
+      const q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+      const batters = REPORT_BATTERS.filter(p => p.name.toLowerCase().includes(q));
+      const bowlers = REPORT_BOWLERS.filter(p => p.name.toLowerCase().includes(q));
+
+      document.getElementById('batterTableBody').innerHTML = batters.map(p => `
+        <tr onclick="openPlayer('${p.id}')" class="hover:bg-slate-50 cursor-pointer transition">
+          <td class="py-3.5 px-4 font-semibold text-slate-400 tabular">${p.rank}</td>
+          <td class="py-3.5 px-4 font-medium text-slate-900">${p.name}</td>
+          <td class="py-3.5 px-4 text-right font-bold text-emerald-600 tabular">${p.pri.toFixed(2)}</td>
+          <td class="py-3.5 px-4 text-right text-slate-700 tabular">${p.balls}</td>
+          <td class="py-3.5 px-4 text-right text-slate-500 tabular">${p.matches}</td>
+          <td class="py-3.5 px-4 text-right text-slate-600 tabular">${p.runs} <span class="text-xs text-slate-400">(${p.fours}/${p.sixes})</span></td>
+        </tr>
+      `).join('') || `<tr><td colspan="6" class="py-6 text-center text-slate-400">No matching batters</td></tr>`;
+
+      document.getElementById('bowlerTableBody').innerHTML = bowlers.map(p => `
+        <tr onclick="openPlayer('${p.id}')" class="hover:bg-slate-50 cursor-pointer transition">
+          <td class="py-3.5 px-4 font-semibold text-slate-400 tabular">${p.rank}</td>
+          <td class="py-3.5 px-4 font-medium text-slate-900">${p.name}</td>
+          <td class="py-3.5 px-4 text-right font-bold text-blue-600 tabular">${p.pri.toFixed(2)}</td>
+          <td class="py-3.5 px-4 text-right text-slate-700 tabular">${p.balls}</td>
+          <td class="py-3.5 px-4 text-right text-slate-500 tabular">${p.matches}</td>
+          <td class="py-3.5 px-4 text-right text-slate-600 tabular">${p.runsConceded} / <span class="font-medium text-slate-900">${p.wickets}w</span></td>
+        </tr>
+      `).join('') || `<tr><td colspan="6" class="py-6 text-center text-slate-400">No matching bowlers</td></tr>`;
+
+      renderMainScatter();
+    }
+
+    function setChartRole(role) {
+      activeChartRole = role;
+      document.getElementById('chartRoleBatter').className = role === 'batter'
+        ? 'px-3 py-1 rounded-md bg-white text-slate-900 font-semibold shadow-sm'
+        : 'px-3 py-1 rounded-md text-slate-600 hover:text-slate-900';
+      document.getElementById('chartRoleBowler').className = role === 'bowler'
+        ? 'px-3 py-1 rounded-md bg-white text-slate-900 font-semibold shadow-sm'
+        : 'px-3 py-1 rounded-md text-slate-600 hover:text-slate-900';
+      renderMainScatter();
+    }
+
+    function renderMainScatter() {
+      destroyChart('mainScatter');
+      const isBat = activeChartRole === 'batter';
+      const players = isBat ? REPORT_BATTERS : REPORT_BOWLERS;
+      const pointColor = isBat ? 'rgba(5, 150, 105, 0.20)' : 'rgba(37, 99, 235, 0.20)';
+      const borderColor = isBat ? '#059669' : '#2563eb';
+
+      const labelPlugin = {
+        id: 'lightLabelPlugin',
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          const meta = chart.getDatasetMeta(0);
+          ctx.save();
+          ctx.font = '500 11px Inter, sans-serif';
+          ctx.fillStyle = '#334155';
+          meta.data.forEach((pt, idx) => {
+            const p = players[idx];
+            const dy = idx % 2 === 0 ? -11 : 15;
+            ctx.textAlign = pt.x > chart.chartArea.right - 55 ? 'right' : 'center';
+            ctx.fillText(p.short, pt.x, pt.y + dy);
+          });
+          ctx.restore();
+        }
+      };
+
+      charts.mainScatter = new Chart(document.getElementById('mainScatterChart'), {
+        type: 'bubble',
+        data: {
+          datasets: [{
+            data: players.map(p => ({
+              x: p.balls,
+              y: p.pri,
+              r: isBat ? Math.max(6, Math.sqrt(p.runs) * 0.6) : Math.max(6, p.wickets * 0.8 + 3)
+            })),
+            backgroundColor: pointColor,
+            borderColor: borderColor,
+            borderWidth: 1.75
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 20, right: 20 } },
+          onClick: (_, els) => { if (els.length) openPlayer(players[els[0].index].id); },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              callbacks: {
+                label: (ctx) => {
+                  const p = players[ctx.dataIndex];
+                  return isBat
+                    ? `${p.name} (#${p.rank}) | PRI ${p.pri} | ${p.balls} balls | ${p.runs} runs`
+                    : `${p.name} (#${p.rank}) | PRI ${p.pri} | ${p.balls} balls | ${p.wickets} wkts`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Pressure Opportunities (Balls)', color: '#64748b', font: { size: 12 } },
+              grid: { color: '#f1f5f9' },
+              ticks: { color: '#64748b' },
+              suggestedMin: 60,
+              suggestedMax: isBat ? 345 : 295
+            },
+            y: {
+              title: { display: true, text: 'PRI Rating', color: '#64748b', font: { size: 12 } },
+              grid: { color: '#f1f5f9' },
+              ticks: { color: '#64748b' },
+              suggestedMin: 61,
+              suggestedMax: isBat ? 82 : 92
+            }
+          }
+        },
+        plugins: [labelPlugin]
+      });
+    }
+
+    function openPlayer(id) {
+      selectedPlayerId = id;
+      switchTab('player');
+    }
+
+    // =========================================================================
+    // TAB 2: PLAYER STATS
+    // =========================================================================
+    function populatePlayerSelectors() {
+      const pSel = document.getElementById('playerSelect');
+      pSel.innerHTML = `
+        <optgroup label="Top 10 Batters">
+          ${REPORT_BATTERS.map(p => `<option value="${p.id}">#${p.rank} ${p.name} (${p.pri})</option>`).join('')}
+        </optgroup>
+        <optgroup label="Top 10 Bowlers">
+          ${REPORT_BOWLERS.map(p => `<option value="${p.id}">#${p.rank} ${p.name} (${p.pri})</option>`).join('')}
+        </optgroup>
+      `;
+      pSel.value = selectedPlayerId;
+      syncCompareOptions();
+    }
+
+    function syncCompareOptions() {
+      const primary = ALL_PLAYERS.find(p => p.id === selectedPlayerId) || REPORT_BATTERS[2];
+      const pool = primary.role === 'batter' ? REPORT_BATTERS : REPORT_BOWLERS;
+      const cSel = document.getElementById('compareSelect');
+      const prev = cSel.value;
+      cSel.innerHTML = pool.map(p => `<option value="${p.id}">#${p.rank} ${p.name} (${p.pri})</option>`).join('');
+      if (pool.some(p => p.id === prev && p.id !== primary.id)) cSel.value = prev;
+      else {
+        const alt = pool.find(p => p.id !== primary.id);
+        cSel.value = alt ? alt.id : primary.id;
+      }
+    }
+
+    function selectPlayerById(id) {
+      selectedPlayerId = id;
+      syncCompareOptions();
+      renderPlayerDeepDive();
+    }
+
+    function renderPlayerDeepDive() {
+      if (!document.getElementById('playerSelect').options.length) populatePlayerSelectors();
+      document.getElementById('playerSelect').value = selectedPlayerId;
+
+      const p = ALL_PLAYERS.find(x => x.id === selectedPlayerId) || REPORT_BATTERS[2];
+      const pool = p.role === 'batter' ? REPORT_BATTERS : REPORT_BOWLERS;
+      const c = pool.find(x => x.id === document.getElementById('compareSelect').value) || pool.find(x => x.id !== p.id);
+      const isBat = p.role === 'batter';
+
+      const sr = isBat ? ((p.runs / p.balls) * 100).toFixed(1) : null;
+      const bndPct = isBat ? (((p.fours * 4 + p.sixes * 6) / p.runs) * 100).toFixed(1) : null;
+      const econ = !isBat ? (p.runsConceded / (p.balls / 6)).toFixed(2) : null;
+      const bowlSR = !isBat ? (p.balls / p.wickets).toFixed(1) : null;
+
+      document.getElementById('playerDetailContainer').innerHTML = `
+        <div class="card p-6 flex flex-col justify-between space-y-5">
+          <div>
+            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full ${isBat ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}">
+              ${isBat ? 'Batter' : 'Bowler'} &bull; Rank #${p.rank}
+            </span>
+            <h2 class="text-2xl font-bold text-slate-900 mt-3">${p.name}</h2>
+            <div class="mt-4 flex items-baseline gap-2.5">
+              <div class="text-4xl font-bold ${isBat ? 'text-emerald-600' : 'text-blue-600'} tabular">${p.pri.toFixed(2)}</div>
+              <div class="text-xs text-slate-500">PRI (+${((p.pri - 50) / 10).toFixed(2)} SD)</div>
+            </div>
+            <div class="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
+              <div class="${isBat ? 'bg-emerald-500' : 'bg-blue-600'} h-full rounded-full" style="width: ${Math.min(100, Math.max(10, p.pri))}%"></div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 pt-4 border-t border-slate-100 text-xs">
+            <div><div class="text-slate-500">Pressure Balls</div><div class="text-lg font-bold text-slate-900 tabular">${p.balls}</div></div>
+            <div><div class="text-slate-500">Matches</div><div class="text-lg font-bold text-slate-900 tabular">${p.matches}</div></div>
+          </div>
+        </div>
+
+        <div class="card p-6 space-y-4">
+          <h3 class="text-sm font-bold text-slate-900">High-Pressure Output (LI &ge; 2.0)</h3>
+          ${isBat ? `
+            <div class="grid grid-cols-2 gap-4 text-xs">
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Runs Scored</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${p.runs}</div></div>
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Strike Rate</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${sr}</div></div>
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Boundaries</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${p.fours}&times;4, ${p.sixes}&times;6</div></div>
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Boundary %</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${bndPct}%</div></div>
+            </div>
+          ` : `
+            <div class="grid grid-cols-2 gap-4 text-xs">
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Runs Conceded</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${p.runsConceded}</div></div>
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Economy Rate</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${econ}</div></div>
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Bowler Wickets</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${p.wickets}</div></div>
+              <div class="bg-slate-50 p-3.5 rounded-xl"><div class="text-slate-500">Strike Rate</div><div class="text-xl font-bold text-slate-900 tabular mt-0.5">${bowlSR}</div></div>
+            </div>
+          `}
+        </div>
+
+        <div class="card p-6 space-y-3">
+          <h3 class="text-sm font-bold text-slate-900">PRI Formula Breakdown</h3>
+          ${p.exactComponents === 'exact' ? `
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between py-1.5 border-b border-slate-100"><span class="text-slate-500">Raw Pressure Rate</span><span class="mono font-semibold text-slate-900">${p.rawRate.toFixed(3)}</span></div>
+              <div class="flex justify-between py-1.5 border-b border-slate-100"><span class="text-slate-500">Shrunken Rate</span><span class="mono font-semibold text-emerald-700">${p.shrRate.toFixed(3)}</span></div>
+              <div class="flex justify-between py-1.5 border-b border-slate-100"><span class="text-slate-500">Low-Pressure Baseline</span><span class="mono text-slate-700">${p.lowRate.toFixed(3)}</span></div>
+              <div class="flex justify-between py-1.5 border-b border-slate-100"><span class="text-slate-500">Pressure Lift</span><span class="mono font-semibold text-blue-700">+${p.verifiedLift.toFixed(3)}</span></div>
+              <div class="p-3 rounded-lg bg-slate-50 mono text-[11px] text-slate-700">
+                50 + 10 &times; [0.75(${p.zShr}) + 0.25(${p.zLift})] = <strong>${p.pri}</strong>
+              </div>
+            </div>
+          ` : `
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between py-1.5 border-b border-slate-100"><span class="text-slate-500">Reported PRI</span><span class="mono font-semibold text-slate-900">${p.pri.toFixed(2)}</span></div>
+              <div class="flex justify-between py-1.5 border-b border-slate-100"><span class="text-slate-500">Reported Lift</span><span class="mono font-semibold text-blue-700">${p.verifiedLift !== null ? '+' + p.verifiedLift.toFixed(3) : 'Summary only'}</span></div>
+              <div class="flex justify-between py-1.5 border-b border-slate-100"><span class="text-slate-500">Composite Z</span><span class="mono font-semibold text-emerald-700">+${((p.pri - 50) / 10).toFixed(3)} SD</span></div>
+              <p class="text-slate-500 pt-2 leading-relaxed">
+                Full intermediate rates are printed in the report for Abhishek Sharma (plus Lift for Iyer &amp; Ashwin). Upload your full CSV in <strong>Regenerate PRI</strong> to view raw rates for every player.
+              </p>
+            </div>
+          `}
+        </div>
+      `;
+
+      renderComparison(p, c);
+    }
+
+    function renderComparison(p, c) {
+      destroyChart('compareBar');
+      const isBat = p.role === 'batter';
+      const pVals = isBat
+        ? [p.pri, (p.runs / p.balls) * 100, p.balls / 3, p.runs / 5]
+        : [p.pri, p.wickets * 4, (p.runsConceded / (p.balls / 6)) * 10, p.balls / 3];
+      const cVals = isBat
+        ? [c.pri, (c.runs / c.balls) * 100, c.balls / 3, c.runs / 5]
+        : [c.pri, c.wickets * 4, (c.runsConceded / (c.balls / 6)) * 10, c.balls / 3];
+
+      charts.compareBar = new Chart(document.getElementById('compareBarChart'), {
+        type: 'bar',
+        data: {
+          labels: isBat ? ['PRI', 'Strike Rate', 'Balls (÷3)', 'Runs (÷5)'] : ['PRI', 'Wickets (×4)', 'Econ (×10)', 'Balls (÷3)'],
+          datasets: [
+            { label: p.name, data: pVals.map(v => +v.toFixed(1)), backgroundColor: '#059669', borderRadius: 6 },
+            { label: c.name, data: cVals.map(v => +v.toFixed(1)), backgroundColor: '#94a3b8', borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#334155' } } },
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { display: false } },
+            y: { ticks: { color: '#64748b' }, grid: { color: '#f1f5f9' } }
+          }
+        }
+      });
+
+      const rows = isBat ? [
+        ['Rank', `#${p.rank}`, `#${c.rank}`],
+        ['PRI', p.pri.toFixed(2), c.pri.toFixed(2)],
+        ['Pressure Balls', p.balls, c.balls],
+        ['Matches', p.matches, c.matches],
+        ['Runs', p.runs, c.runs],
+        ['4s / 6s', `${p.fours} / ${p.sixes}`, `${c.fours} / ${c.sixes}`],
+        ['Strike Rate', ((p.runs / p.balls) * 100).toFixed(1), ((c.runs / c.balls) * 100).toFixed(1)]
+      ] : [
+        ['Rank', `#${p.rank}`, `#${c.rank}`],
+        ['PRI', p.pri.toFixed(2), c.pri.toFixed(2)],
+        ['Pressure Balls', p.balls, c.balls],
+        ['Matches', p.matches, c.matches],
+        ['Runs Conceded', p.runsConceded, c.runsConceded],
+        ['Bowler Wickets', p.wickets, c.wickets],
+        ['Economy', (p.runsConceded / (p.balls / 6)).toFixed(2), (c.runsConceded / (c.balls / 6)).toFixed(2)]
+      ];
+
+      document.getElementById('compareTableContainer').innerHTML = `
+        <table class="w-full text-xs text-left">
+          <thead class="border-b border-slate-200 text-slate-500 uppercase">
+            <tr>
+              <th class="py-2">Metric</th>
+              <th class="py-2 text-right text-emerald-700">${p.name}</th>
+              <th class="py-2 text-right text-slate-700">${c.name}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 tabular">
+            ${rows.map(r => `<tr><td class="py-2.5 text-slate-500">${r[0]}</td><td class="py-2.5 text-right font-semibold text-slate-900">${r[1]}</td><td class="py-2.5 text-right font-medium text-slate-700">${r[2]}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // =========================================================================
+    // TAB 3: SIMULATOR
+    // =========================================================================
+    function toggleSimInningsUI() {
+      const inn = document.getElementById('simInnings').value;
+      document.getElementById('simRunsLabel').textContent = inn === '2' ? 'Runs Required' : 'Current Score';
+      document.getElementById('simRuns').max = inn === '2' ? 220 : 250;
+    }
+
+    function applySimPreset(preset) {
+      if (preset === 'comfort') {
+        document.getElementById('simInnings').value = '2';
+        document.getElementById('simBalls').value = 30;
+        document.getElementById('simWkts').value = 1;
+        document.getElementById('simRuns').value = 25;
+      } else if (preset === 'thriller') {
+        document.getElementById('simInnings').value = '2';
+        document.getElementById('simBalls').value = 6;
+        document.getElementById('simWkts').value = 8;
+        document.getElementById('simRuns').value = 12;
+      } else if (preset === 'inn1_rescue') {
+        document.getElementById('simInnings').value = '1';
+        document.getElementById('simBalls').value = 24;
+        document.getElementById('simWkts').value = 6;
+        document.getElementById('simRuns').value = 135;
+      }
+      toggleSimInningsUI();
+      updateLeverageSimulator();
+    }
+
+    function approxWinProb(format, innings, ballsLeft, wktsLost, runsVal) {
+      if (wktsLost >= 10) return innings === 2 ? (runsVal <= 0 ? 1 : 0) : 0.02;
+      if (innings === 2) {
+        if (runsVal <= 0) return 1.0;
+        if (ballsLeft <= 0) return 0.0;
+        const par = format === 'IPL' ? 182 : 172;
+        const wFactor = Math.pow((10 - wktsLost) / 10, 0.70);
+        const bFactor = Math.pow(ballsLeft / 120, 0.68);
+        const expRem = par * wFactor * bFactor;
+        const sd = Math.max(4.6, 33 * Math.sqrt(ballsLeft / 120) * (0.45 + 0.55 * wFactor));
+        return 1 / (1 + Math.exp(-1.75 * ((expRem - runsVal) / sd)));
+      } else {
+        const par = format === 'IPL' ? 178 : 168;
+        const wFactor = Math.pow((10 - wktsLost) / 10, 0.72);
+        const bFactor = Math.pow(Math.max(0, ballsLeft) / 120, 0.72);
+        const proj = runsVal + par * wFactor * bFactor;
+        const sd = Math.max(6.0, 31 * Math.sqrt(Math.max(1, ballsLeft) / 120) * (0.45 + 0.55 * wFactor));
+        return 1 / (1 + Math.exp(-1.55 * ((proj - par) / sd)));
+      }
+    }
+
+    function updateLeverageSimulator() {
+      const format = document.getElementById('simFormat').value;
+      const innings = parseInt(document.getElementById('simInnings').value, 10);
+      const ballsLeft = parseInt(document.getElementById('simBalls').value, 10);
+      const wktsLost = parseInt(document.getElementById('simWkts').value, 10);
+      const runsVal = parseInt(document.getElementById('simRuns').value, 10);
+
+      document.getElementById('simBallsVal').textContent = `${ballsLeft} balls`;
+      document.getElementById('simWktsVal').textContent = `${wktsLost} wickets`;
+      document.getElementById('simRunsVal').textContent = `${runsVal} runs`;
+
+      const wpNow = approxWinProb(format, innings, ballsLeft, wktsLost, runsVal);
+      const probs = ballsLeft <= 30 ? [0.28, 0.36, 0.08, 0.12, 0.09, 0.07] : [0.36, 0.37, 0.07, 0.11, 0.05, 0.04];
+      const outcomes = [
+        { label: '0', r: 0, w: 0, p: probs[0] },
+        { label: '1', r: 1, w: 0, p: probs[1] },
+        { label: '2–3', r: 2.2, w: 0, p: probs[2] },
+        { label: '4', r: 4, w: 0, p: probs[3] },
+        { label: '6+', r: 6, w: 0, p: probs[4] },
+        { label: 'Wicket', r: 0, w: 1, p: probs[5] }
+      ];
+
+      const deltas = outcomes.map(o => {
+        const nextRuns = innings === 2 ? Math.max(0, runsVal - o.r) : runsVal + o.r;
+        const nextWp = approxWinProb(format, innings, Math.max(0, ballsLeft - 1), Math.min(10, wktsLost + o.w), nextRuns);
+        return (nextWp - wpNow) * 100;
+      });
+
+      const expSwingPct = outcomes.reduce((acc, o, i) => acc + o.p * Math.abs(deltas[i]), 0);
+      const li = expSwingPct / (innings === 2 ? 2.45 : 1.85);
+
+      document.getElementById('simWpOut').textContent = `${(wpNow * 100).toFixed(1)}%`;
+      document.getElementById('simLiOut').textContent = li.toFixed(2);
+
+      const box = document.getElementById('simBadgeBox');
+      const vTitle = document.getElementById('simVerdictTitle');
+      const vSub = document.getElementById('simVerdictSub');
+      if (li >= 2.0) {
+        box.className = 'p-4 rounded-xl border flex flex-col justify-center bg-emerald-50 border-emerald-200';
+        vTitle.className = 'text-xs font-bold uppercase text-emerald-700';
+        vTitle.textContent = 'High Pressure';
+        vSub.className = 'text-[11px] text-emerald-600 mt-0.5';
+        vSub.textContent = 'LI ≥ 2.0 (Scored)';
+      } else {
+        box.className = 'p-4 rounded-xl border flex flex-col justify-center bg-slate-50 border-slate-200';
+        vTitle.className = 'text-xs font-bold uppercase text-slate-600';
+        vTitle.textContent = 'Ordinary';
+        vSub.className = 'text-[11px] text-slate-500 mt-0.5';
+        vSub.textContent = 'LI < 2.0 (Baseline)';
+      }
+
+      destroyChart('simOutcome');
+      charts.simOutcome = new Chart(document.getElementById('simOutcomeChart'), {
+        type: 'bar',
+        data: {
+          labels: outcomes.map(o => `${o.label} (${(o.p * 100).toFixed(0)}%)`),
+          datasets: [{
+            data: deltas.map(d => +d.toFixed(2)),
+            backgroundColor: deltas.map(d => d >= 0 ? '#059669' : '#e11d48'),
+            borderRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#475569', font: { size: 11 } }, grid: { display: false } },
+            y: {
+              title: { display: true, text: 'Win Prob Swing (pp)', color: '#64748b', font: { size: 11 } },
+              ticks: { color: '#64748b' },
+              grid: { color: '#f1f5f9' }
+            }
+          }
+        }
+      });
+    }
+
+    // =========================================================================
+    // TAB 4: REGENERATE ENGINE
+    // =========================================================================
+    function syncWeights(changed) {
+      const wPerfEl = document.getElementById('wPerfInput');
+      const wLiftEl = document.getElementById('wLiftInput');
+      if (changed === 'perf') wLiftEl.value = (1 - parseFloat(wPerfEl.value)).toFixed(2);
+      else wPerfEl.value = (1 - parseFloat(wLiftEl.value)).toFixed(2);
+      regenerateFromControls();
+    }
+
+    function regenerateFromControls() {
+      const w1 = parseFloat(document.getElementById('wPerfInput').value);
+      const w2 = parseFloat(document.getElementById('wLiftInput').value);
+      const minBalls = parseInt(document.getElementById('minBallsInput').value, 10);
+      const minMatches = parseInt(document.getElementById('minMatchesInput').value, 10);
+      const tauFloor = parseFloat(document.getElementById('tauFloorInput').value);
+
+      document.getElementById('wPerfLabel').textContent = w1.toFixed(2);
+      document.getElementById('wLiftLabel').textContent = w2.toFixed(2);
+      document.getElementById('minBallsLabel').textContent = minBalls;
+      document.getElementById('minMatchTauLabel').textContent = `${minMatches} / ${tauFloor.toFixed(1)}`;
+      document.getElementById('regenSubtitle').innerHTML = `PRI = 50 + 10 &times; [${w1.toFixed(2)} &middot; Z(shrunken) + ${w2.toFixed(2)} &middot; Z(lift)] &bull; &ge;${minBalls} balls, &ge;${minMatches} matches`;
+
+      if (customRegenPool) {
+        runFullEmpiricalBayes(customRegenPool, w1, w2, minBalls, minMatches, tauFloor);
+      } else {
+        const calcRole = (arr) => arr
+          .filter(p => p.balls >= minBalls && p.matches >= minMatches)
+          .map(p => ({ ...p, newPri: +(50 + 10 * (w1 * p.zShr + w2 * p.zLift)).toFixed(2) }))
+          .sort((a, b) => b.newPri - a.newPri)
+          .slice(0, 10);
+
+        lastRegenOutput = { batters: calcRole(REPORT_BATTERS), bowlers: calcRole(REPORT_BOWLERS) };
+        renderRegenTables(lastRegenOutput);
+      }
+    }
+
+    function runFullEmpiricalBayes(poolRows, w1, w2, minBalls, minMatches, tauFloor) {
+      const computeRole = (roleName) => {
+        const pool = poolRows.filter(r => r.role === roleName && r.balls >= 30 && r.matches >= 3);
+        if (!pool.length) return [];
+
+        const meanRaw = pool.reduce((s, r) => s + r.rawRate, 0) / pool.length;
+        const varRaw = pool.length > 1
+          ? pool.reduce((s, r) => s + Math.pow(r.rawRate - meanRaw, 2), 0) / (pool.length - 1) : 0;
+        const meanNoise = pool.reduce((s, r) => s + (r.s2 / r.balls), 0) / pool.length;
+        const tau2 = Math.max(tauFloor, varRaw - meanNoise);
+
+        const enriched = pool.map(r => {
+          const lambda = tau2 / (tau2 + (r.s2 / r.balls));
+          const shrunken = meanRaw + lambda * (r.rawRate - meanRaw);
+          return { ...r, lambda, shrunken, lift: shrunken - r.lowRate };
+        });
+
+        const avgShr = enriched.reduce((s, r) => s + r.shrunken, 0) / enriched.length;
+        const sdShr = Math.sqrt(enriched.reduce((s, r) => s + Math.pow(r.shrunken - avgShr, 2), 0) / Math.max(1, enriched.length - 1)) || 1;
+        const avgLift = enriched.reduce((s, r) => s + r.lift, 0) / enriched.length;
+        const sdLift = Math.sqrt(enriched.reduce((s, r) => s + Math.pow(r.lift - avgLift, 2), 0) / Math.max(1, enriched.length - 1)) || 1;
+
+        return enriched
+          .map(r => {
+            const zShr = (r.shrunken - avgShr) / sdShr;
+            const zLift = (r.lift - avgLift) / sdLift;
+            return { ...r, zShr, zLift, newPri: +(50 + 10 * (w1 * zShr + w2 * zLift)).toFixed(2), rank: '-' };
+          })
+          .filter(r => r.balls >= minBalls && r.matches >= minMatches)
+          .sort((a, b) => b.newPri - a.newPri)
+          .slice(0, 10);
+      };
+
+      lastRegenOutput = { batters: computeRole('batter'), bowlers: computeRole('bowler') };
+      renderRegenTables(lastRegenOutput);
+    }
+
+    function renderRegenTables(out) {
+      const renderRows = (arr) => arr.map((p, idx) => {
+        const newRank = idx + 1;
+        const delta = p.rank !== '-' ? p.rank - newRank : 0;
+        const badge = p.rank === '-' ? 'CSV' : (delta > 0 ? `<span class="text-emerald-600">+${delta}</span>` : (delta < 0 ? `<span class="text-rose-600">${delta}</span>` : '—'));
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2.5 px-3 font-semibold text-slate-900">${newRank}</td>
+            <td class="py-2.5 px-3 font-medium text-slate-800">${p.name}</td>
+            <td class="py-2.5 px-3 text-right font-bold text-emerald-600">${p.newPri.toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-right text-slate-500">${p.rank} (${badge})</td>
+            <td class="py-2.5 px-3 text-right text-slate-500">${p.balls} / ${p.matches}</td>
+          </tr>
+        `;
+      }).join('') || `<tr><td colspan="5" class="py-5 text-center text-slate-400">No eligible players</td></tr>`;
+
+      document.getElementById('regenBatterBody').innerHTML = renderRows(out.batters);
+      document.getElementById('regenBowlerBody').innerHTML = renderRows(out.bowlers);
+    }
+
+    function handleCSVUpload(evt) {
+      const file = evt.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => processRawCSVText(e.target.result, file.name);
+      reader.readAsText(file);
+    }
+
+    function processRawCSVText(text, sourceLabel) {
+      const lines = text.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (lines.length < 2) return alert('CSV needs a header row and at least one data row.');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const rows = lines.slice(1).map(line => {
+        const cols = line.split(',').map(c => c.trim());
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = cols[i]);
+        return obj;
+      });
+
+      if (headers.includes('li') && headers.includes('wpa')) {
+        const map = {};
+        rows.forEach(r => {
+          const role = (r.role || '').toLowerCase();
+          const key = `${r.player}__${role}`;
+          if (!map[key]) map[key] = { name: r.player, role, matchesSet: new Set(), highWpas: [], lowWpas: [] };
+          map[key].matchesSet.add(r.match_id);
+          const li = parseFloat(r.li), wpa = parseFloat(r.wpa) * 100;
+          if (!isNaN(li) && !isNaN(wpa)) {
+            if (li >= 2.0) map[key].highWpas.push(wpa);
+            else map[key].lowWpas.push(wpa);
+          }
+        });
+        customRegenPool = Object.values(map).map(p => {
+          const n = p.highWpas.length;
+          const rawRate = n ? p.highWpas.reduce((a, b) => a + b, 0) / n : 0;
+          const s2 = n > 1 ? p.highWpas.reduce((a, b) => a + Math.pow(b - rawRate, 2), 0) / (n - 1) : 100;
+          const lowRate = p.lowWpas.length ? p.lowWpas.reduce((a, b) => a + b, 0) / p.lowWpas.length : 0;
+          return { name: p.name, role: p.role, matches: p.matchesSet.size, balls: n, rawRate, lowRate, s2 };
+        });
+      } else if (headers.includes('raw_rate') && headers.includes('low_pressure_rate')) {
+        customRegenPool = rows.map(r => ({
+          name: r.player,
+          role: (r.role || 'batter').toLowerCase(),
+          matches: parseInt(r.matches, 10) || 0,
+          balls: parseInt(r.pressure_balls, 10) || 0,
+          rawRate: parseFloat(r.raw_rate) || 0,
+          lowRate: parseFloat(r.low_pressure_rate) || 0,
+          s2: parseFloat(r.s2) || 400
+        }));
+      } else {
+        return alert('Unrecognized CSV columns. Please download one of the templates.');
+      }
+
+      document.getElementById('regenStatusBanner').className = 'text-xs px-4 py-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800';
+      document.getElementById('regenStatusBanner').innerHTML = `Mode: <span class="font-semibold">Live Empirical-Bayes CSV (${sourceLabel})</span> &mdash; Computed from ${customRegenPool.length} player records.`;
+      regenerateFromControls();
+    }
+
+    function resetToReportCohort() {
+      customRegenPool = null;
+      document.getElementById('csvFileInput').value = '';
+      document.getElementById('wPerfInput').value = '0.75';
+      document.getElementById('wLiftInput').value = '0.25';
+      document.getElementById('minBallsInput').value = '75';
+      document.getElementById('minMatchesInput').value = '8';
+      document.getElementById('tauFloorInput').value = '1.0';
+      document.getElementById('regenStatusBanner').className = 'text-xs px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800';
+      document.getElementById('regenStatusBanner').innerHTML = `Mode: <span class="font-semibold">Report Cohort Sensitivity</span> &mdash; Adjusting weights on the Top-10 cohort. Upload a CSV or click "Run Sample Pool CSV" to run full Empirical-Bayes calculation from raw rates.`;
+      regenerateFromControls();
+    }
+
+    function loadSampleCSVIntoEngine() {
+      const sampleCSV = [
+        'player,role,matches,pressure_balls,raw_rate,low_pressure_rate,s2',
+        'Abhishek Sharma,batter,77,322,0.728,0.175,540',
+        'Shreyas Iyer,batter,31,150,1.120,0.080,410',
+        'Phil Salt,batter,50,216,0.820,0.140,480',
+        'Yashasvi Jaiswal,batter,56,218,0.750,0.130,500',
+        'Mark Chapman,batter,17,83,0.910,0.110,450',
+        'Cameron Green,batter,29,108,0.810,0.120,470',
+        'Tilak Varma,batter,44,257,0.610,0.115,430',
+        'Glenn Maxwell,batter,27,129,0.720,0.095,520',
+        'Jacob Bethell,batter,14,77,0.860,0.100,460',
+        'Virat Kohli,batter,58,289,0.580,0.130,390',
+        'Pool Avg Batter A,batter,20,45,0.150,0.110,490',
+        'Pool Avg Batter B,batter,18,52,0.050,0.080,510',
+        'Ravichandran Ashwin,bowler,25,124,1.680,0.050,380',
+        'Josh Hazlewood,bowler,38,236,1.120,0.120,410',
+        'Axar Patel,bowler,59,252,0.790,0.110,360',
+        'Taskin Ahmed,bowler,29,134,0.890,0.090,420',
+        'Michael Bracewell,bowler,17,90,0.920,0.080,430',
+        'Rashid Khan,bowler,58,272,0.710,0.140,390',
+        'Obed McCoy,bowler,23,107,0.840,0.070,460',
+        'Sunil Narine,bowler,33,113,0.780,0.100,370',
+        'Mohsin Khan,bowler,24,96,0.810,0.090,410',
+        'Spencer Johnson,bowler,12,75,0.850,0.085,440',
+        'Pool Avg Bowler A,bowler,16,42,0.100,0.070,480'
+      ].join('\n');
+      processRawCSVText(sampleCSV, 'Sample_EB_Pool.csv');
+    }
+
+    function downloadTemplateCSV(kind) {
+      const content = kind === 'player'
+        ? 'player,role,matches,pressure_balls,raw_rate,low_pressure_rate,s2\nAbhishek Sharma,batter,77,322,0.728,0.175,540\nRavichandran Ashwin,bowler,25,124,1.680,0.050,380\n'
+        : 'match_id,player,role,li,wpa\n1001,Abhishek Sharma,batter,2.45,0.042\n1001,Abhishek Sharma,batter,0.95,0.008\n1001,Ravichandran Ashwin,bowler,2.80,0.055\n';
+      triggerDownload(content, kind === 'player' ? 'pri_player_template.csv' : 'pri_ball_by_ball_template.csv', 'text/csv');
+    }
+
+    function exportRegeneratedCSV() {
+      const rows = ['role,new_rank,player,new_pri,orig_rank,pressure_balls,matches'];
+      lastRegenOutput.batters.forEach((p, i) => rows.push(`batter,${i + 1},"${p.name}",${p.newPri},${p.rank},${p.balls},${p.matches}`));
+      lastRegenOutput.bowlers.forEach((p, i) => rows.push(`bowler,${i + 1},"${p.name}",${p.newPri},${p.rank},${p.balls},${p.matches}`));
+      triggerDownload(rows.join('\n'), 'regenerated_pri_top10.csv', 'text/csv');
+    }
+
+    function triggerDownload(content, filename, mime) {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // =========================================================================
+    // PYTHON SCRIPT
+    // =========================================================================
+    const PYTHON_SCRIPT = `"""
+T20 Pressure Reliability Index (PRI) - Reproducible Pipeline
+IPL + T20I (22 Jan 2022 to 1 Nov 2026) | 766 Matches | 183,167 Deliveries
+Exact Section 4 reproduction hyperparameters & Empirical-Bayes rating logic.
+"""
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import GroupKFold
+from sklearn.metrics import roc_auc_score, brier_score_loss, log_loss
+from xgboost import XGBClassifier
+
+XGB_PARAMS = dict(
+    n_estimators=350,
+    max_depth=4,
+    learning_rate=0.045,
+    subsample=0.88,
+    colsample_bytree=0.90,
+    min_child_weight=30,
+    reg_lambda=5.0,
+    random_state=2026,
+    eval_metric="logloss",
+    n_jobs=-1,
+)
+
+INNINGS1_FEATURES = [
+    "format_code", "season", "phase_code", "score", "wickets_lost",
+    "balls_remaining", "current_rr", "recent_runs_12", "recent_wkts_12", "elo_diff"
+]
+INNINGS2_FEATURES = INNINGS1_FEATURES + [
+    "target", "runs_required", "required_rr", "rr_gap"
+]
+
+def fit_oof_win_prob(df_inn: pd.DataFrame, features: list[str], name: str) -> pd.Series:
+    gkf = GroupKFold(n_splits=5)
+    oof_wp = pd.Series(index=df_inn.index, dtype=float)
+    for tr_idx, va_idx in gkf.split(df_inn[features], df_inn["batting_team_won"], df_inn["match_id"]):
+        model = XGBClassifier(**XGB_PARAMS)
+        model.fit(df_inn.iloc[tr_idx][features], df_inn.iloc[tr_idx]["batting_team_won"])
+        oof_wp.iloc[va_idx] = model.predict_proba(df_inn.iloc[va_idx][features])[:, 1]
+    print(f"[{name}] AUC={roc_auc_score(df_inn['batting_team_won'], oof_wp):.3f} | "
+          f"Brier={brier_score_loss(df_inn['batting_team_won'], oof_wp):.3f} | "
+          f"LogLoss={log_loss(df_inn['batting_team_won'], oof_wp):.3f}")
+    return oof_wp
+
+def compute_pri_rankings(
+    deliveries: pd.DataFrame,
+    role: str,
+    pool_min_balls: int = 30,
+    pool_min_matches: int = 3,
+    top_min_balls: int = 75,
+    top_min_matches: int = 8,
+    tau2_floor: float = 1.0,
+    w_perf: float = 0.75,
+    w_lift: float = 0.25,
+    export_pool_csv: str | None = None,
+) -> pd.DataFrame:
+    wpa_col = "wpa_batter" if role == "batter" else "wpa_bowler"
+    df = deliveries.dropna(subset=[wpa_col]).copy()
+    df["wpa_100"] = df[wpa_col] * 100.0
+    df["is_pressure"] = df["li"] >= 2.0
+
+    hi = df[df["is_pressure"]].groupby("player").agg(
+        pressure_balls=("wpa_100", "count"),
+        matches=("match_id", "nunique"),
+        raw_rate=("wpa_100", "mean"),
+        s2=("wpa_100", lambda x: np.var(x, ddof=1) if len(x) > 1 else 0.0),
+    )
+    lo = df[~df["is_pressure"]].groupby("player").agg(
+        low_pressure_rate=("wpa_100", "mean")
+    )
+    pool = hi.join(lo, how="inner")
+    pool = pool[(pool["pressure_balls"] >= pool_min_balls) & (pool["matches"] >= pool_min_matches)].copy()
+
+    if export_pool_csv:
+        pool.reset_index().assign(role=role)[
+            ["player", "role", "matches", "pressure_balls", "raw_rate", "low_pressure_rate", "s2"]
+        ].to_csv(export_pool_csv, index=False)
+
+    mu = pool["raw_rate"].mean()
+    noise_mean = (pool["s2"] / pool["pressure_balls"]).mean()
+    tau2 = max(tau2_floor, pool["raw_rate"].var(ddof=1) - noise_mean)
+
+    pool["lambda"] = tau2 / (tau2 + (pool["s2"] / pool["pressure_balls"]))
+    pool["shrunken_rate"] = mu + pool["lambda"] * (pool["raw_rate"] - mu)
+    pool["pressure_lift"] = pool["shrunken_rate"] - pool["low_pressure_rate"]
+
+    pool["z_shrunken"] = (pool["shrunken_rate"] - pool["shrunken_rate"].mean()) / pool["shrunken_rate"].std(ddof=1)
+    pool["z_lift"] = (pool["pressure_lift"] - pool["pressure_lift"].mean()) / pool["pressure_lift"].std(ddof=1)
+    pool["PRI"] = 50.0 + 10.0 * (w_perf * pool["z_shrunken"] + w_lift * pool["z_lift"])
+
+    top10 = pool[(pool["pressure_balls"] >= top_min_balls) & (pool["matches"] >= top_min_matches)]
+    return top10.sort_values("PRI", ascending=False).head(10).reset_index()
+`;
+
+    function copyPythonCode() {
+      navigator.clipboard.writeText(PYTHON_SCRIPT).then(() => {
+        const btn = document.getElementById('copyPyBtn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 1800);
+      });
+    }
+
+    function downloadPythonCode() {
+      triggerDownload(PYTHON_SCRIPT, 'regenerate_pri.py', 'text/x-python');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('pythonCodeBlock').textContent = PYTHON_SCRIPT;
+      populatePlayerSelectors();
+      renderRankings();
+    });
+  </script>
+</body>
+</html>
